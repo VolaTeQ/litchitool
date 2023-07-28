@@ -17,14 +17,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run tests
+      run: cargo test --verbose
       env:
         LITCHI_USERNAME: ${{ secrets.LITCHI_USERNAME }}
         LITCHI_PASSWORD: ${{ secrets.LITCHI_PASSWORD }}
-      run: cargo test --verbose
     - name: Release Build
       run: cargo build --release --verbose
     - name: Upload CLI artifact
-    - uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v3.1.2
       with:
         # Artifact name
         name: Litchi CLI # optional, default is artifact
