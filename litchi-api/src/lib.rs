@@ -164,7 +164,7 @@ impl LitchiApi {
         debug!("Requesting misssions");
         let response = self
             .client
-            .post(API_BASE.to_string() + "/parse/classes/Mission")
+            .get(API_BASE.to_string() + "/parse/classes/Mission")
             .header("X-Parse-Session-Token", &self.session_data.session_token)
             .json(&payload)
             .send()
