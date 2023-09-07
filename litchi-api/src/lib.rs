@@ -99,7 +99,7 @@ impl LitchiApi {
 
         let (mission_lat, mission_long) =
             mission.waypoints().get(0).map_or((0.0, 0.0), |waypoint| {
-                (waypoint.coordinates.0, waypoint.coordinates.1)
+                (waypoint.coordinate.0, waypoint.coordinate.1)
             });
 
         let upload_payload = json!({

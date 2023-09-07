@@ -55,6 +55,8 @@ pub fn read_from_csv<R: Read>(mut reader: Reader<R>) -> Result<LitchiMission, Li
             photo_distance_interval (f32) ACTIONS_END + 7
         );
 
+        let mut heading = heading;
+
         let gimbal_mode = GimbalPitchMode::try_from(gimbal_mode)
             .map_err(|err| LitchiError::TryFromPrimitiveError(err.number.to_string()))?;
         let altitude_mode = AltitudeMode::try_from(altitude_mode)
@@ -94,8 +96,7 @@ pub fn read_from_csv<R: Read>(mut reader: Reader<R>) -> Result<LitchiMission, Li
 
             if poi_longitude != 0. && poi_latitude != 0. && poi_altitude != 0. {
                 Some(POI {
-                    latitude: poi_latitude,
-                    longitude: poi_longitude,
+                    coordinate: Coordinate(poi_latitude, poi_longitude),
                     altitude: poi_altitude,
                     altitude_mode: poi_altitude_mode,
                 })
@@ -104,7 +105,11 @@ pub fn read_from_csv<R: Read>(mut reader: Reader<R>) -> Result<LitchiMission, Li
             }
         };
 
-        // TODO: Compute heading to POI
+        let coordinates = Coordinate(latitude, longitude);
+
+        if let Some(poi) = &poi {
+            heading = coordinates.heading_towards(&poi.coordinate) as f32;
+        }
 
         let poi_index = poi.map(|poi| {
             pois.iter()
@@ -115,10 +120,8 @@ pub fn read_from_csv<R: Read>(mut reader: Reader<R>) -> Result<LitchiMission, Li
                 })
         });
 
-        let coordinates = Coordinate(latitude, longitude);
-
         waypoints.push(Waypoint {
-            coordinates,
+            coordinate: coordinates,
             altitude,
             altitude_mode,
             heading,
@@ -130,10 +133,8 @@ pub fn read_from_csv<R: Read>(mut reader: Reader<R>) -> Result<LitchiMission, Li
             actions,
             turn_mode: 0,
             photo_interval: photo_time_interval
-                .map(|interval| PhotoInterval::Time(interval))
-                .or_else(|| {
-                    photo_distance_interval.map(|interval| PhotoInterval::Distance(interval))
-                }),
+                .map(PhotoInterval::Time)
+                .or_else(|| photo_distance_interval.map(PhotoInterval::Distance)),
             repeat_actions: 1,
             rotation_dir,
             stay_time: 3,

@@ -1,4 +1,7 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    f64::consts::PI,
+    hash::{Hash, Hasher},
+};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use num_enum::TryFromPrimitive;
@@ -70,7 +73,7 @@ pub enum AltitudeMode {
 
 #[derive(Debug, Clone)]
 pub struct Waypoint {
-    pub coordinates: Coordinate,
+    pub coordinate: Coordinate,
     pub altitude: f32,
     /// Heading of the waypoint, must be between -180 and 180 TODO: validate
     pub heading: f32,
@@ -91,8 +94,7 @@ pub struct Waypoint {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct POI {
-    pub latitude: f64,
-    pub longitude: f64,
+    pub coordinate: Coordinate,
     pub altitude: f32,
     pub altitude_mode: AltitudeMode,
 }
@@ -201,8 +203,8 @@ impl LitchiMission {
             buf.put_f32(waypoint.speed);
             buf.put_i16(waypoint.stay_time);
             buf.put_i16(waypoint.max_reach_time);
-            buf.put_f64(waypoint.coordinates.0);
-            buf.put_f64(waypoint.coordinates.1);
+            buf.put_f64(waypoint.coordinate.0);
+            buf.put_f64(waypoint.coordinate.1);
             buf.put_f32(waypoint.curve_size);
             buf.put_i32(waypoint.gimbal_mode as i32);
             buf.put_i32(waypoint.gimbal_pitch_angle);
@@ -232,15 +234,15 @@ impl LitchiMission {
 
         // POI positions
         for poi in &self.pois {
-            buf.put_f64(poi.latitude);
-            buf.put_f64(poi.longitude);
+            buf.put_f64(poi.coordinate.0);
+            buf.put_f64(poi.coordinate.1);
             buf.put_f32(poi.altitude);
         }
 
         // Set waypoint altitude and POI info
         for waypoint in &self.waypoints {
             buf.put_i16(waypoint.altitude_mode as i16);
-            buf.put_f32(waypoint.altitude as f32);
+            buf.put_f32(waypoint.altitude);
             buf.put_i32(waypoint.poi_index.map_or(-1, |index| {
                 index.try_into().expect("POI index must fit into i32")
             }));
@@ -305,10 +307,16 @@ impl Default for MissionConfig {
 
 impl Hash for POI {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.latitude.to_bits().hash(state);
-        self.longitude.to_bits().hash(state);
+        self.coordinate.hash(state);
         self.altitude.to_bits().hash(state);
         self.altitude_mode.hash(state);
+    }
+}
+
+impl Hash for Coordinate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+        self.1.to_bits().hash(state);
     }
 }
 
@@ -322,5 +330,31 @@ impl Action {
             Self::RotateAircraft(rotation) => (4, *rotation),
             Self::TiltCamera(tilt) => (5, *tilt),
         }
+    }
+}
+
+fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees * PI / 180.
+}
+
+fn radians_to_degrees(radians: f64) -> f64 {
+    radians * 180. / PI
+}
+
+impl Coordinate {
+    pub fn heading_towards(&self, other: &Coordinate) -> f64 {
+        let lat1 = degrees_to_radians(self.0);
+        let lat2 = degrees_to_radians(other.0);
+        let delta_lon = degrees_to_radians(other.1 - self.1);
+
+        let y = delta_lon.sin() * lat2.cos();
+        let x = lat1.cos() * lat2.sin() - lat1.sin() * lat2.cos() * delta_lon.cos();
+
+        radians_to_degrees(y.atan2(x))
+    }
+
+    pub fn valid(&self) -> bool {
+        const VALID_RANGE: std::ops::Range<f64> = (-180.)..180.;
+        VALID_RANGE.contains(&self.0) && VALID_RANGE.contains(&self.1)
     }
 }
