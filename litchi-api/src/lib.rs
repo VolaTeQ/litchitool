@@ -91,6 +91,7 @@ impl LitchiApi {
             .client
             .post(url)
             .header("Content-Type", "application/octet-stream")
+            .header("X-Parse-Session-Token", &self.session_data.session_token)
             .body(mission_bin)
             .send()
             .await?;
